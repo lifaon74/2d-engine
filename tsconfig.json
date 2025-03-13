@@ -1,0 +1,56 @@
+{
+  "compilerOptions": {
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "alwaysStrict": true,
+    "declaration": false,
+    "downlevelIteration": true,
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": true,
+
+    "noEmitHelpers": false,
+    "noFallthroughCasesInSwitch": false,
+    "noImplicitUseStrict": false,
+    "noLib": false,
+    "pretty": true,
+
+    "removeComments": false,
+    "preserveConstEnums": false,
+    "sourceMap": true,
+    "strictFunctionTypes": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "noUnusedLocals": false,
+    "suppressImplicitAnyIndexErrors": true,
+    "useUnknownInCatchVariables": true,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": true,
+    "moduleResolution": "node",
+    "useDefineForClassFields": false,
+    "stripInternal": false,
+    "target": "esnext",
+    "outDir": "./dist",
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@webgpu/types"
+    ],
+    "baseUrl": ".",
+    "module": "esnext",
+    "importHelpers": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "formatCodeOptions": {
+    "indentSize": 2,
+    "tabSize": 2
+  },
+  "bazelOptions": {
+    "suppressTsconfigOverrideWarnings": true
+  }
+}
