@@ -1,5 +1,5 @@
 {
-  "name": "voxel",
+  "name": "2d-engin",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -12,21 +12,16 @@
   },
   "sideEffects": false,
   "devDependencies": {
-    "@vitest/coverage-v8": "2.1.4",
-    "@webgpu/types": "^0.1.51",
-    "prettier": "^3.3.3",
+    "@vitest/coverage-istanbul": "3.0.8",
+    "prettier": "^3.5.3",
     "prettier-plugin-organize-imports": "^4.1.0",
-    "sass": "^1.80.6",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.10",
-    "vitest": "^2.1.4"
+    "sass": "^1.85.1",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.1",
+    "vitest": "^3.0.8"
   },
   "dependencies": {
-    "@lifaon/math": "beta",
-    "@lifaon/traits": "beta",
-    "@lirx/unsubscribe": "beta",
-    "@lirx/utils": "beta",
     "tslib": "^2.8.1"
   },
-  "packageManager": "yarn@4.5.1"
+  "packageManager": "yarn@4.7.0"
 }

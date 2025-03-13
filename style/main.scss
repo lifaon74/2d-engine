@@ -1,0 +1,30 @@
+* {
+  &,
+  &::before,
+  &::after {
+    box-sizing: border-box;
+    outline: none;
+  }
+}
+
+html,
+body {
+  border: 0;
+  margin: 0;
+  padding: 0;
+
+  width: 100%;
+  height: 100%;
+
+  position: fixed;
+  top: 0;
+  right: 0;
+  overflow: hidden;
+  //font-size: 0;
+  font-family: Hevetica, Arial, sans-serif;
+}
+
+body {
+  overflow: auto;
+}
+
