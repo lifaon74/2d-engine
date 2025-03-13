@@ -1,0 +1,38 @@
+export class Texture2dWithHeightMap {
+  static async fromUrls(textureUrl: string, depthUrl: string): Promise<Texture2dWithHeightMap> {
+    const [texture, depth] = await Promise.all([
+      fetch(textureUrl).then((response) => response.blob()),
+      fetch(depthUrl).then((response) => response.blob())
+    ]);
+  }
+
+  // static fromBlob(): Promise<Texture2DWithHeightMap> {
+  //   createImageBitmap()
+  // }
+
+  // static fromBlob(): Promise<Texture2DWithHeightMap> {
+  //   createImageBitmap()
+  // }
+
+  static fromImageBitmap(imageBitmap: ImageBitmap): Promise<Texture2dWithHeightMap> {
+    createImageBitmap();
+  }
+
+  static fromImageData(imageData: ImageData, depth: Uint16Array): Texture2dWithHeightMap {
+    return new Texture2dWithHeightMap(
+      imageData.width,
+      imageData.height,
+      new Uint8Array(imageData.data.buffer, imageData.data.byteLength, imageData.data.byteLength),
+      depth
+    );
+  }
+
+  readonly width: number;
+  readonly height: number;
+
+  readonly data: Uint8Array;
+  readonly depth: Uint16Array;
+
+  constructor(width: number, height: number, color: Uint8Array, depth: Uint16Array) {
+  }
+}

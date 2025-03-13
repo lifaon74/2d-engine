@@ -1,0 +1,19 @@
+export class Texture2dWithHeightMap {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array; // [...N*[r, g, b, a, hl, hh]]
+
+  constructor(
+    width: number,
+    height: number,
+    data: Uint8Array = new Uint8Array(width * height * 6),
+  ) {
+    if (data.length !== width * height * 6) {
+      throw new Error(`data should have a length of ${width * height * 6} (width * height * 6)`);
+    }
+
+    this.width = width;
+    this.height = height;
+    this.data = data;
+  }
+}

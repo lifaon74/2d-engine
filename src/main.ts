@@ -1,57 +1,58 @@
+import { download } from './image-helpers/download';
+import { urlToImageData } from './image-helpers/url-to-image-data';
+import { Texture2dWithHeightMap } from './texture/texture-2d-with-height-map';
 
+// import tilesetUrl from '../assets/flurmimons_tileset___nature_by_flurmimon_d9leui9-fullview.png';
+const tilesetUrl: URL = new URL(
+  '../assets/raw/flurmimons_tileset___nature_by_flurmimon_d9leui9-fullview.png',
+  import.meta.url,
+);
 
-// [...N*[r, g, b, a, h]]
+async function extractImage(x: number, y: number, w: number, h: number, fileName: string) {
+  const imageData = await urlToImageData(tilesetUrl);
 
-export class Texture2DWithHeightMap {
-  static async fromUrls(textureUrl: string, depthUrl: string): Promise<Texture2DWithHeightMap> {
-    const [texture, depth] = await Promise.all([
-      fetch(textureUrl).then(response => response.blob()),
-      fetch(depthUrl).then(response => response.blob()),
-    ]);
-  }
-
-
-  // static fromBlob(): Promise<Texture2DWithHeightMap> {
-  //   createImageBitmap()
-  // }
-
-  // static fromBlob(): Promise<Texture2DWithHeightMap> {
-  //   createImageBitmap()
-  // }
-
-  static fromImageBitmap(imageBitmap: ImageBitmap): Promise<Texture2DWithHeightMap> {
-    createImageBitmap()
-  }
-
-  static fromImageData(imageData: ImageData, depth: Uint16Array): Texture2DWithHeightMap {
-   return new Texture2DWithHeightMap(
-     imageData.width,
-     imageData.height,
-     new Uint8Array(imageData.data.buffer, imageData.data.byteLength, imageData.data.byteLength),
-     depth,
-   );
-  }
-
-  readonly width: number;
-  readonly height: number;
-
-  readonly color: Uint8Array;
-  readonly depth: Uint16Array;
-
-  constructor(
-    width: number,
-    height: number,
-    color: Uint8Array,
-    depth: Uint16Array,
-  ) {
-  }
-
+  const ctx: CanvasRenderingContext2D = document.createElement('canvas').getContext('2d')!;
+  ctx.canvas.width = w * 16;
+  ctx.canvas.height = h * 16;
+  console.log(x * 16, y * 16, w * 16, h * 16);
+  ctx.putImageData(imageData, -x * 16, -y * 16, x * 16, y * 16, w * 16, h * 16);
+  download(ctx.canvas.toDataURL(), fileName);
 }
 
-function main(): void {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  // ctx.drawImage
+// await extractImage(0, 6, 3, 4, 'tree-00.png');
+// await extractImage(0, 10, 3, 4, 'tree-01.png');
+
+async function loadTree00(): Promise<Texture2dWithHeightMap> {
+  return Texture2dWithHeightMap.fromImageData(
+    await urlToImageData(new URL('../assets/tree-00.png', import.meta.url)),
+  );
+}
+
+async function loadTree01(): Promise<Texture2dWithHeightMap> {
+  return Texture2dWithHeightMap.fromImageData(
+    await urlToImageData(new URL('../assets/tree-01.png', import.meta.url)),
+  );
+}
+
+async function debug_00() {
+  const tree00 = await loadTree00();
+  const tree01 = await loadTree01();
+  tree01.depth.fill(10);
+
+  tree00.draw(tree01, 0, 0);
+
+  const ctx: CanvasRenderingContext2D = document.createElement('canvas').getContext('2d')!;
+  ctx.canvas.width = tree00.width;
+  ctx.canvas.height = tree00.height;
+  document.body.appendChild(ctx.canvas);
+  ctx.putImageData(tree00.toImageData(), 0, 0);
+}
+
+async function main() {
+  await debug_00();
+  // const canvas = document.createElement('canvas');
+  // const ctx = canvas.getContext('2d');
+  // // ctx.drawImage
   // ctx.putImageData();
 }
 
