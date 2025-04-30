@@ -37,15 +37,16 @@ export class Texture2dWithHeightMap {
     this.depth = depth;
   }
 
-  draw(
+  put(
     source: Texture2dWithHeightMap,
     destination_x: number,
     destination_y: number,
+    destination_depth: number,
     source_x: number = 0,
     source_y: number = 0,
     source_width: number = source.width,
     source_height: number = source.height,
-  ): this {
+  ): void {
     destination_x = Math.max(0, Math.min(this.width, destination_x));
     destination_y = Math.max(0, Math.min(this.height, destination_y));
 
@@ -63,7 +64,7 @@ export class Texture2dWithHeightMap {
       for (
         let _source_x: number = source_x,
           source_depth_index: number = _source_y * source.width,
-          destination_depth_index: number = _destination_y * this.width,
+          destination_depth_index: number = destination_x + _destination_y * this.width,
           source_color_index: number = source_depth_index * 4,
           destination_color_index: number = destination_depth_index * 4;
         _source_x < source_width;
@@ -73,8 +74,10 @@ export class Texture2dWithHeightMap {
           source_color_index += 4,
           destination_color_index += 4
       ) {
-        if (source.depth[source_depth_index] > this.depth[source_depth_index]) {
-          this.depth[source_depth_index] = source.depth[source_depth_index];
+        const source_depth: number = source.depth[source_depth_index] + destination_depth;
+
+        if (source_depth >= this.depth[source_depth_index] && source_depth <= 0xffff) {
+          this.depth[source_depth_index] = source_depth;
 
           // https://en.wikipedia.org/wiki/Alpha_compositing
           const alpha_source: number = source.color[source_color_index + 3] / 255;
@@ -103,8 +106,11 @@ export class Texture2dWithHeightMap {
         }
       }
     }
+  }
 
-    return this;
+  clear(): void {
+    this.color.fill(0);
+    this.depth.fill(0);
   }
 
   toImageData(): ImageData {
