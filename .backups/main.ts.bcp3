@@ -1,0 +1,385 @@
+import { createCanvasRenderingContext2d } from './helpers/create-canvas-rendering-context-2d';
+import { displayCanvas } from './helpers/display-canvas';
+import { imageUrlToImageData } from './helpers/image-url-to-image-data';
+import { ImageWithDepth } from './image-with-depth/image-with-depth';
+
+export interface RendererImageElement {
+  readonly x: number /* int32 */;
+  readonly y: number /* int32 */;
+  readonly z: number /* int32 */;
+  readonly image: ImageWithDepth<any>;
+}
+
+export class CPUImageRenderer {
+  readonly #width: number;
+  readonly #height: number;
+  #x: number /* int32 */;
+  #y: number /* int32 */;
+
+  #elements: readonly RendererImageElement[];
+  readonly #opaqueLayer: ImageWithDepth<Int32Array>;
+
+  /**
+   * NOTE: the layers are sorted by depth, from the lowest to the highest
+   * NOTE: the layers have depth always strictly greater than the opaque layer's depth (except for if the opaque layer is fully transparent)
+   */
+  readonly #transparentLayers: readonly ImageWithDepth<Int32Array>[];
+  readonly #transparentLayersStart: Uint8Array;
+  readonly #transparentLayersEnd: Uint8Array;
+  readonly #output: ImageData;
+
+  constructor(width: number, height: number) {
+    this.#width = width;
+    this.#height = height;
+
+    this.#x = 0;
+    this.#y = 0;
+
+    this.#elements = [];
+    this.#opaqueLayer = ImageWithDepth.new(width, height, Int32Array);
+    this.#transparentLayers = Array.from(
+      { length: 8 },
+      (): ImageWithDepth<Int32Array> => ImageWithDepth.new(width, height, Int32Array),
+    );
+    this.#transparentLayersStart = new Uint8Array(width * height);
+    this.#transparentLayersEnd = new Uint8Array(width * height);
+    this.#output = new ImageData(width, height);
+  }
+
+  /* VIEW */
+
+  get width(): number {
+    return this.#width;
+  }
+
+  get height(): number {
+    return this.#height;
+  }
+
+  get x(): number {
+    return this.#x;
+  }
+
+  get y(): number {
+    return this.#y;
+  }
+
+  setView(x: number, y: number): void {
+    this.#x = x;
+    this.#y = y;
+  }
+
+  /* ELEMENTS */
+
+  get elements(): readonly RendererImageElement[] {
+    return this.#elements;
+  }
+
+  setElements(value: readonly RendererImageElement[]) {
+    this.#elements = value;
+  }
+
+  /* LAYERS */
+
+  // get layers(): readonly ImageWithDepth[] {
+  //   return this.#transparentLayers;
+  // }
+
+  #clearLayers(): void {
+    this.#opaqueLayer.data.fill(0);
+
+    this.#transparentLayersStart.fill(0);
+
+    for (let i: number = 0; i < this.#transparentLayers.length; i++) {
+      this.#transparentLayers[i].data.fill(0);
+      this.#transparentLayers[i].depth.fill(0);
+    }
+  }
+
+  /**
+   * Returns the `index` of a `transparentLayer`, where `depth` should be inserted to keep them in order.
+   *
+   * TODO: optimize using a binary search
+   */
+  #getTransparentLayerInsertIndex(viewportIndex: number, depth: number): number {
+    const length_transparent_layers: number = this.#transparentLayersStart[viewportIndex];
+
+    for (
+      let i_transparent_layer: number = 0;
+      i_transparent_layer < length_transparent_layers;
+      i_transparent_layer++
+    ) {
+      if (this.#transparentLayers[i_transparent_layer].depth[viewportIndex] >= depth) {
+        return i_transparent_layer;
+      }
+    }
+
+    return 0;
+  }
+
+  renderLayers(): void {
+    this.#clearLayers();
+
+    for (let i: number = 0; i < this.#elements.length; i++) {
+      const element: RendererImageElement = this.#elements[i];
+
+      const x_delta: number = element.x - this.#x;
+      const x_viewport_start: number = Math.max(0, Math.min(this.#width, x_delta));
+      const x_viewport_end: number = Math.max(
+        0,
+        Math.min(this.#width, x_delta + element.image.width),
+      );
+
+      const y_delta: number = element.y - this.#y;
+      const y_viewport_start: number = Math.max(0, Math.min(this.#height, y_delta));
+      const y_viewport_end: number = Math.max(
+        0,
+        Math.min(this.#height, y_delta + element.image.height),
+      );
+
+      // const z_element: number = Math.max(0, Math.min(0xffff, element.z));
+      // const z_element: number = element.z;
+
+      for (let x_viewport: number = x_viewport_start; x_viewport < x_viewport_end; x_viewport++) {
+        const x_element: number = x_viewport - x_delta;
+
+        for (let y_viewport: number = y_viewport_start; y_viewport < y_viewport_end; y_viewport++) {
+          const y_element: number = y_viewport - y_delta;
+
+          const i_viewport: number = x_viewport + y_viewport * this.#width;
+          const i_viewport_data: number = i_viewport * 4;
+
+          const i_element: number = x_element + y_element * element.image.width;
+          const i_element_data: number = i_element * 4;
+
+          const alpha_element: number = element.image.data[i_element_data + 3];
+
+          if (alpha_element === 0) {
+            // the element's pixel is fully transparent
+            // => skip pixel's rendering
+            continue;
+          }
+
+          const depth_element: number = element.z + element.image.depth[i_element];
+
+          const alpha_opaque_layer: number = this.#opaqueLayer.data[i_viewport_data + 3];
+          const depth_opaque_layer: number = this.#opaqueLayer.depth[i_viewport];
+
+          if (alpha_opaque_layer === 0 || depth_element >= depth_opaque_layer) {
+            // the element's pixel is above the opaque-layer's pixel
+
+            if (alpha_element === 0xff) {
+              // the element's pixel is opaque
+
+              // update the opaque-layer's pixel
+              {
+                // set rgba
+                for (let i: number = 0; i < 4; i++) {
+                  this.#opaqueLayer.data[i_viewport_data + i] =
+                    element.image.data[i_element_data + i];
+                }
+
+                this.#opaqueLayer.depth[i_viewport] = depth_element;
+              }
+
+              // update the transparent-layers
+              {
+                // cleanup every transparent-layers that are below the new opaque-layer's depth
+
+                const length_transparent_layers: number = this.#transparentLayersStart[i_viewport];
+
+                if (length_transparent_layers === this.#transparentLayers.length) {
+                  console.warn(
+                    'Reached max transparent layers length: ',
+                    this.#transparentLayers.length,
+                  );
+                }
+
+                const i_transparent_layer_to_insert: number = this.#getTransparentLayerInsertIndex(
+                  i_viewport,
+                  depth_element,
+                );
+                // TODO blend layers that have the same depth
+
+                // shift the layers that have a depth greater than the new opaque-layer's depth
+                for (
+                  let i_transparent_layer: number = i_transparent_layer_to_insert;
+                  i_transparent_layer < length_transparent_layers;
+                  i_transparent_layer++
+                ) {
+                  const data_layer_0: Uint8ClampedArray =
+                    this.#transparentLayers[i_transparent_layer - i_transparent_layer_to_insert]
+                      .data;
+
+                  const data_layer_1: Uint8ClampedArray =
+                    this.#transparentLayers[i_transparent_layer - i_transparent_layer_to_insert]
+                      .data;
+
+                  for (let i: number = 0; i < 4; i++) {
+                    data_layer_0[i_viewport_data + i] = data_layer_1[i_viewport_data + i];
+                  }
+                }
+              }
+
+              // TODO must cleanup every transparentLayers that are below the new opaque layer's depth
+            } else {
+              // the element's pixel is transparent
+
+              if (depth_element === depth_opaque_layer && alpha_opaque_layer !== 0) {
+                // the element's pixel merges with the opaque-layer's pixel
+                // => alpha blending
+                const alpha: number = 1 - alpha_element / 0xff;
+
+                // set rgb (NOTE: alpha is always 1)
+                for (let i: number = 0; i < 3; i++) {
+                  this.#opaqueLayer.data[i_viewport_data + i] =
+                    this.#opaqueLayer.data[i_viewport_data + i] * alpha +
+                    element.image.data[i_element_data + i];
+                }
+              } else {
+                // the element's pixel must be added to one of the layers
+
+                const length_transparent_layers: number = this.#transparentLayersStart[i_viewport];
+
+                // TODO
+                this.#transparentLayers[0].data[i_viewport_data] =
+                  element.image.data[i_element_data];
+                this.#transparentLayers[0].data[i_viewport_data + 1] =
+                  element.image.data[i_element_data + 1];
+                this.#transparentLayers[0].data[i_viewport_data + 2] =
+                  element.image.data[i_element_data + 2];
+                this.#transparentLayers[0].data[i_viewport_data + 3] =
+                  element.image.data[i_element_data + 3];
+                this.#transparentLayersStart[i_viewport] = 1;
+              }
+            }
+          }
+          // {else} the element's pixel is below the opaque-layer's pixel
+          // => skip pixel's rendering
+        }
+      }
+    }
+  }
+
+  /* OUTPUT */
+
+  get output(): ImageData {
+    return this.#output;
+  }
+
+  #clearOutput(): void {
+    this.#output.data.fill(0);
+  }
+
+  renderOutput(): void {
+    this.#output.data.set(this.#opaqueLayer.data);
+
+    for (let x_viewport: number = 0; x_viewport < this.#width; x_viewport++) {
+      for (let y_viewport: number = 0; y_viewport < this.#height; y_viewport++) {
+        const i_viewport: number = x_viewport + y_viewport * this.#width;
+        const i_viewport_data: number = i_viewport * 4;
+
+        const length_transparent_layers: number = this.#transparentLayersStart[i_viewport];
+
+        for (
+          let i_transparent_layer: number = 0;
+          i_transparent_layer < length_transparent_layers;
+          i_transparent_layer++
+        ) {
+          const data_layer: Uint8ClampedArray = this.#transparentLayers[i_transparent_layer].data;
+
+          const alpha: number = 1 - data_layer[i_viewport_data + 3] / 0xff;
+
+          for (let i: number = 0; i < 4; i++) {
+            this.#output.data[i_viewport_data + i] =
+              this.#output.data[i_viewport_data + i] * alpha + data_layer[i_viewport_data + i];
+          }
+        }
+      }
+    }
+  }
+}
+
+/*------*/
+
+async function loadTree00(): Promise<ImageWithDepth<Uint16Array>> {
+  return ImageWithDepth.fromImageData(
+    await imageUrlToImageData(new URL('../assets/tree-00.png?url', import.meta.url)),
+    Uint16Array,
+  );
+}
+
+// async function loadTree01(): Promise<ImageWithDepth> {
+//   return ImageWithDepth.fromImageData(
+//     await imageUrlToImageData(new URL('../assets/tree-01.png', import.meta.url)),
+//   );
+// }
+
+/*------*/
+
+async function debug_01() {
+  // const renderer: CPUImageRenderer = new CPUImageRenderer(256, 256);
+  // const renderer: CPUImageRenderer = new CPUImageRenderer(1024, 1024);
+  const renderScale: number = 1 / 2;
+  const renderer: CPUImageRenderer = new CPUImageRenderer(
+    window.screen.width * renderScale,
+    window.screen.height * renderScale,
+  );
+
+  renderer.setView(0, 0);
+
+  const ctx = createCanvasRenderingContext2d(renderer.width, renderer.height);
+  // scaleCanvas(ctx.canvas, 1 / renderScale);
+  displayCanvas(ctx.canvas);
+
+  const tree00: ImageWithDepth<Uint16Array> = await loadTree00();
+
+  const elements: RendererImageElement[] = [];
+  for (let y: number = 0; y < 32; y++) {
+    const s: number = ((y % 2) * 48) / 2;
+
+    for (let x: number = 0; x < 32; x++) {
+      elements.push({
+        x: x * 48 + s,
+        y: y * 32,
+        z: y,
+        image: tree00,
+      });
+    }
+  }
+
+  renderer.setElements(elements);
+
+  // renderer.setElements([
+  //   {
+  //     x: 16,
+  //     y: 16,
+  //     z: 32,
+  //     image: tree00,
+  //   },
+  //   {
+  //     x: 48,
+  //     y: 0,
+  //     z: 16,
+  //     image: tree00,
+  //   },
+  // ]);
+
+  console.time('render');
+  renderer.renderLayers();
+  renderer.renderOutput();
+  console.timeEnd('render');
+
+  ctx.putImageData(renderer.output, 0, 0);
+
+  Object.assign(window, {
+    renderer,
+  });
+}
+
+async function main() {
+  // await debug_00();
+  await debug_01();
+}
+
+main();

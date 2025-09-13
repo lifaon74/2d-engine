@@ -2,10 +2,11 @@ import { createCanvasRenderingContext2d } from './helpers/create-canvas-renderin
 import { displayCanvas } from './helpers/display-canvas';
 import { download } from './helpers/download';
 import { imageUrlToImageData } from './helpers/image-url-to-image-data';
-import { scaleCanvas } from './helpers/scale-canvas';
-import { Texture2dWithZBuffer } from './texture/texture2d-with-z-buffer';
+import { ImageWithDepth } from './image-with-depth/image-with-depth';
+import { CPUImageRenderer, RendererImageElement } from './renderer/cpu-image-renderer';
 
-// import tilesetUrl from '../assets/flurmimons_tileset___nature_by_flurmimon_d9leui9-fullview.png';
+/*------*/
+
 const tilesetUrl: URL = new URL(
   '../assets/raw/flurmimons_tileset___nature_by_flurmimon_d9leui9-fullview.png',
   import.meta.url,
@@ -19,153 +20,197 @@ async function extractImage(x: number, y: number, w: number, h: number, fileName
   ctx.canvas.height = h * 16;
   console.log(x * 16, y * 16, w * 16, h * 16);
   ctx.putImageData(imageData, -x * 16, -y * 16, x * 16, y * 16, w * 16, h * 16);
-  download(ctx.canvas.toDataURL(), fileName);
+  displayCanvas(ctx.canvas);
+
+  window.onclick = () => {
+    download(ctx.canvas.toDataURL(), fileName);
+  };
 }
 
-// await extractImage(0, 6, 3, 4, 'tree-00.png');
-// await extractImage(0, 10, 3, 4, 'tree-01.png');
+// await extractImage(2, 29, 2, 2, 'rock-brown-large-01.png');
+// await extractImage(8, 29, 2, 2, 'rock-grey-large-00.png');
+// await extractImage(5, 14, 5, 3, 'autotile--ground-with-grass.png');
+// await extractImage(1, 0, 1, 1, 'floor--grass-01.png');
 
-async function loadTree00(): Promise<Texture2dWithZBuffer> {
-  return Texture2dWithZBuffer.fromImageData(
-    await imageUrlToImageData(new URL('../assets/tree-00.png', import.meta.url)),
+/*------*/
+
+async function loadGrass01(): Promise<ImageWithDepth<Uint8Array>> {
+  return ImageWithDepth.fromImageData(
+    await imageUrlToImageData(new URL('../assets/floors/floor--grass-01.png?url', import.meta.url)),
+    Uint8Array,
   );
 }
 
-async function loadTree01(): Promise<Texture2dWithZBuffer> {
-  return Texture2dWithZBuffer.fromImageData(
-    await imageUrlToImageData(new URL('../assets/tree-01.png', import.meta.url)),
+async function loadTree00(): Promise<ImageWithDepth<Uint8Array>> {
+  return ImageWithDepth.fromImageData(
+    await imageUrlToImageData(new URL('../assets/trees/tree-00.png?url', import.meta.url)),
+    Uint8Array,
   );
 }
 
-/*-------*/
-
-export class CanvasRenderer {
-  readonly #ctx: CanvasRenderingContext2D;
-  #mainTexture: Texture2dWithZBuffer;
-
-  readonly #textures: Set<Texture2dWithZBuffer>;
-
-  constructor(width: number, height: number) {
-    this.#ctx = createCanvasRenderingContext2d(width, height);
-    this.#mainTexture = new Texture2dWithZBuffer(width, height);
-    this.#textures = new Set<Texture2dWithZBuffer>();
-  }
-
-  get canvas(): HTMLCanvasElement {
-    return this.#ctx.canvas;
-  }
-
-  get textures(): Set<Texture2dWithZBuffer> {
-    return this.#textures;
-  }
-
-  setSize(width: number, height: number): this {
-    this.#ctx.canvas.width = width;
-    this.#ctx.canvas.height = height;
-
-    this.#mainTexture = new Texture2dWithZBuffer(width, height);
-
-    return this;
-  }
-
-  render(): void {
-    this.#mainTexture.clear();
-    this.#ctx.putImageData(this.#mainTexture.toImageData(), 0, 0);
-  }
-}
-
-/*-------*/
-
-export class Character {
-  readonly name: string;
-}
-
-export class NPC extends Character {
-  interact(player: any): void {
-    // player pressed "SPACE" near NPC
-  }
-}
-
-export class Player extends Character {
-  readonly name: string;
-}
-
-export class WorldBlocBuilder {
-  generate(): Texture2dWithZBuffer {}
-}
-
-export class WorldMap {}
-
-/*-------*/
-
-// async function debug_00() {
-//   const width: number = window.screen.availWidth * devicePixelRatio;
-//   const height: number = window.screen.availHeight * devicePixelRatio;
-//   // const map = new Texture2dWithHeightMap(width, height);
-//   // const map = new Texture2dWithHeightMap(3840, 2160); // 4K
-//   const map = new Texture2dZBuffer(256, 256);
-//
-//   const tree00 = await loadTree00();
-//   const tree01 = await loadTree01();
-//
-//   const ctx: CanvasRenderingContext2D = createCanvasRenderingContext2d(map.width, map.height);
-//   scaleCanvas(ctx.canvas, 1);
-//   displayCanvas(ctx.canvas);
-//   // document.body.appendChild(ctx.canvas);
-//
-//   console.time('render');
-//
-//   for (let y: number = 0; y < 100; y++) {
-//     const _x: number = y % 2 === 0 ? 0 : 16 * 1.5;
-//
-//     for (let x: number = 0; x < 100; x++) {
-//       map.put(tree00, x * 16 * 3 + _x, y * 16 * 2, 0);
-//     }
-//   }
-//   // map.draw(tree00, 0, 0, 0);
-//   // map.draw(tree01, 32, 0, 1);
-//
-//   ctx.putImageData(map.toImageData(), 0, 0);
-//   console.timeEnd('render');
-//
-//   // window.onclick = () => {
-//   //   document.body.requestFullscreen();
-//   // };
+// async function loadTree01(): Promise<ImageWithDepth> {
+//   return ImageWithDepth.fromImageData(
+//     await imageUrlToImageData(new URL('../assets/tree-01.png', import.meta.url)),
+//   );
 // }
 
-async function debug_01() {
-  const renderer = new CanvasRenderer(256, 256);
+export interface AssembleAutoTileOptions {
+  readonly tileSize: number;
+  readonly generate: (
+    x0y0: number,
+    x1y0: number,
+    x0y1: number,
+    x1y1: number,
+  ) => ImageWithDepth<any>;
+  readonly width: number;
+  readonly height: number;
+  readonly map: ArrayLike<number>;
+}
 
-  const tree00 = await loadTree00();
-  const tree01 = await loadTree01();
+export function assembleAutoTile({
+  tileSize,
+  generate,
+  width,
+  height,
+  map,
+}: AssembleAutoTileOptions): ImageWithDepth<Uint8Array> {
+  const output: ImageWithDepth<Uint8Array> = ImageWithDepth.new(
+    (width - 1) * tileSize,
+    (height - 1) * tileSize,
+    Uint8Array,
+  );
 
-  scaleCanvas(renderer.canvas, 1);
-  displayCanvas(renderer.canvas);
-
-  console.time('write-textures');
-  renderer.textures.add(tree00);
-
-  for (let y: number = 0; y < 100; y++) {
-    const _x: number = y % 2 === 0 ? 0 : 16 * 1.5;
-
-    for (let x: number = 0; x < 100; x++) {
-      renderer.textures.add(tree00);
+  for (let y: number = 1; y < height; y++) {
+    for (let x: number = 1; x < width; x++) {
+      const tile: ImageWithDepth<any> = generate(
+        map[x - 1 + (y - 1) * width],
+        map[x + (y - 1) * width],
+        map[x - 1 + y * width],
+        map[x + y * width],
+      );
     }
   }
 
-  console.timeEnd('write-textures');
+  return output;
+}
+
+/*------*/
+
+async function debug_01() {
+  // const renderer: CPUImageRenderer = new CPUImageRenderer(256, 256);
+  // const renderer: CPUImageRenderer = new CPUImageRenderer(1024, 1024);
+  const renderScale: number = 1 / 2;
+  const renderer: CPUImageRenderer = new CPUImageRenderer(
+    window.screen.width * renderScale,
+    window.screen.height * renderScale,
+  );
+
+  renderer.setView(0, 0);
+
+  const ctx = createCanvasRenderingContext2d(renderer.width, renderer.height);
+  // scaleCanvas(ctx.canvas, 1 / renderScale);
+  displayCanvas(ctx.canvas);
+
+  const grass00: ImageWithDepth<Uint8Array> = await loadGrass01();
+  const tree00: ImageWithDepth<Uint8Array> = await loadTree00();
+
+  const elements: RendererImageElement[] = [];
+
+  for (let y: number = 0; y < 68; y++) {
+    for (let x: number = 0; x < 120; x++) {
+      elements.push({
+        x: x * 16,
+        y: y * 16,
+        z: -1,
+        image: grass00,
+      });
+    }
+  }
+
+  for (let y: number = 0; y < 32; y++) {
+    const s: number = ((y % 2) * 48) / 2;
+
+    for (let x: number = 0; x < 32; x++) {
+      elements.push({
+        x: x * 48 + s,
+        y: y * 32,
+        z: y,
+        image: tree00,
+      });
+    }
+  }
+
+  renderer.setElements(elements);
+
+  // renderer.setElements([
+  //   {
+  //     x: 0,
+  //     y: 0,
+  //     z: 0,
+  //     image: tree00,
+  //   },
+  //   // {
+  //   //   x: 0,
+  //   //   y: 0,
+  //   //   z: 16,
+  //   //   image: tree00,
+  //   // },
+  //   // {
+  //   //   x: 0,
+  //   //   y: 0,
+  //   //   z: 8,
+  //   //   image: tree00,
+  //   // },
+  //   // {
+  //   //   x: 0,
+  //   //   y: 0,
+  //   //   z: 9,
+  //   //   image: tree00,
+  //   // },
+  //   //
+  //   // {
+  //   //   x: 0,
+  //   //   y: 0,
+  //   //   z: 3,
+  //   //   image: tree00,
+  //   // },
+  //   // {
+  //   //   x: 0,
+  //   //   y: 0,
+  //   //   z: 4,
+  //   //   image: tree00,
+  //   // },
+  //   // {
+  //   //   x: 0,
+  //   //   y: 0,
+  //   //   z: 2,
+  //   //   image: tree00,
+  //   // },
+  //   // {
+  //   //   x: 0,
+  //   //   y: 0,
+  //   //   z: 2,
+  //   //   image: tree00,
+  //   // },
+  // ]);
 
   console.time('render');
-
-  // map.draw(tree00, 0, 0, 0);
-  // map.draw(tree01, 32, 0, 1);
-
-  ctx.putImageData(map.toImageData(), 0, 0);
+  renderer.renderLayers();
+  renderer.renderOutput();
   console.timeEnd('render');
 
-  // window.onclick = () => {
-  //   document.body.requestFullscreen();
-  // };
+  // renderer.setElements(renderer.extractLayers());
+  //
+  // console.time('render2');
+  // renderer.renderLayers();
+  // renderer.renderOutput();
+  // console.timeEnd('render2');
+
+  ctx.putImageData(renderer.output, 0, 0);
+
+  Object.assign(window, {
+    renderer,
+  });
 }
 
 async function main() {

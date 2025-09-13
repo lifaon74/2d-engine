@@ -1,3 +1,6 @@
+/**
+ * @deprecated
+ */
 export class Texture2dWithZBuffer {
   static fromImageData(imageData: ImageData, depth?: Uint16Array): Texture2dWithZBuffer {
     return new Texture2dWithZBuffer(
