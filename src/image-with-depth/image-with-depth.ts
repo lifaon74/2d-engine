@@ -90,4 +90,37 @@ export class ImageWithDepth<GDepthArrayType extends TypedArray> {
     this.color = color;
     this.depth = depth;
   }
+
+  cut(x: number, y: number, width: number, height: number): ImageWithDepth<GDepthArrayType> {
+    const x_start: number = Math.max(0, Math.min(this.width, x));
+    const y_start: number = Math.max(0, Math.min(this.height, y));
+    const x_end: number = Math.max(0, Math.min(this.width, x + width));
+    const y_end: number = Math.max(0, Math.min(this.height, y + height));
+
+    const output: ImageWithDepth<GDepthArrayType> = ImageWithDepth.new<GDepthArrayType>(
+      x_end - x_start,
+      y_end - y_start,
+      this.depth.constructor as TypedArrayConstructor<GDepthArrayType>,
+    );
+
+    for (let y_current: number = y_start; y_current < y_end; y_current++) {
+      for (let x_current: number = x_start; x_current < x_end; x_current++) {
+        const inputIndex: number = x_current + y_current * this.width;
+        const inputColorIndex: number = inputIndex * 4;
+        const inputDepthIndex: number = inputIndex;
+
+        const outputIndex: number = x_current - x_start + (y_current - y_start) * output.width;
+        const outputColorIndex: number = outputIndex * 4;
+        const outputDepthIndex: number = outputIndex;
+
+        for (let i: number = 0; i < 4; i++) {
+          output.color[outputColorIndex + i] = this.color[inputColorIndex + i];
+        }
+
+        output.depth[outputDepthIndex] = this.depth[inputDepthIndex];
+      }
+    }
+
+    return output;
+  }
 }

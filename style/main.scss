@@ -26,5 +26,23 @@ body {
 
 body {
   overflow: auto;
+  font-family: "Pixelify Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
 }
 
+button {
+  //background: green right bottom / 16px 16px no-repeat/*, url(paper.gif) left top repeat*/;
+  //background-color: green;
+  //background-image: linear-gradient(black, white);
+  //background-size: 16px 16px;
+  //background-position: right bottom;
+  //background-repeat: no-repeat;
+
+  background: url("https://i.imgur.com/yM1ts8x.png");
+  background-size: contain;
+  width: 600px;
+  height: 300px;
+  position: relative;
+  image-rendering: pixelated;
+}

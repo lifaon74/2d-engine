@@ -1,0 +1,47 @@
+import { ImageWithDepth } from '../image-with-depth/image-with-depth';
+
+export interface AssembleAutotileOptions {
+  readonly tileSize: number;
+  readonly generate: (
+    x0y0: number,
+    x1y0: number,
+    x0y1: number,
+    x1y1: number,
+    output: ImageWithDepth<Uint8Array>,
+    x: number,
+    y: number,
+  ) => void;
+  readonly width: number;
+  readonly height: number;
+  readonly map: ArrayLike<number>;
+}
+
+export function assembleAutotile({
+  tileSize,
+  generate,
+  width,
+  height,
+  map,
+}: AssembleAutotileOptions): ImageWithDepth<Uint8Array> {
+  const output: ImageWithDepth<Uint8Array> = ImageWithDepth.new(
+    (width - 1) * tileSize,
+    (height - 1) * tileSize,
+    Uint8Array,
+  );
+
+  for (let y: number = 1; y < height; y++) {
+    for (let x: number = 1; x < width; x++) {
+      generate(
+        map[x - 1 + (y - 1) * width],
+        map[x + (y - 1) * width],
+        map[x - 1 + y * width],
+        map[x + y * width],
+        output,
+        x * tileSize,
+        y * tileSize,
+      );
+    }
+  }
+
+  return output;
+}
