@@ -1,4 +1,4 @@
-import { getUintNArrayConstructorFittingRange } from '../helpers/typed-array/get-uint-n-array-constructor-fitting-range';
+import { getUintNArrayConstructorFittingRange } from '../../helpers/typed-array/get-uint-n-array-constructor-fitting-range';
 import { ImageWithDepth } from '../image-with-depth/image-with-depth';
 
 export interface RendererImageElement {

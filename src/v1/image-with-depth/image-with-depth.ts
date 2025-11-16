@@ -1,5 +1,5 @@
-import { type TypedArray } from '../helpers/typed-array/typed-array';
-import { TypedArrayConstructor } from '../helpers/typed-array/typed-array-constructor';
+import { type TypedArray } from '../../helpers/typed-array/typed-array';
+import { TypedArrayConstructor } from '../../helpers/typed-array/typed-array-constructor';
 
 export type ImageWithDepthDefaultDepthType = Uint16Array;
 

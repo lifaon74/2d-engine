@@ -1,5 +1,5 @@
+import { DataImage2d } from '../../images/built-in/data-image2d';
 import { createTileUnit } from '../autotile/tile-unit';
-import { DataImage2d } from '../images/built-in/data-image2d';
 
 // async function extractFlurmimonsTilesetTiles() {
 //   const tilesetUrl: URL = new URL(
