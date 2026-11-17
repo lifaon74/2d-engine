@@ -59,15 +59,97 @@ export abstract class Data2d {
     ctor: Data2dConstructor<GData2d>,
   ): Promise<GData2d> {
     await imageElement.decode();
-    // const canvas: HTMLCanvasElement = document.createElement('canvas');
-    // canvas.width = imageElement.naturalWidth;
-    // canvas.height = imageElement.naturalHeight;
-    const canvas: OffscreenCanvas = new OffscreenCanvas(
+    const ctx: OffscreenCanvasRenderingContext2D = new OffscreenCanvas(
       imageElement.naturalWidth,
       imageElement.naturalHeight,
-    );
-    const ctx: OffscreenCanvasRenderingContext2D = canvas.getContext('2d')!;
+    ).getContext('2d')!;
     ctx.drawImage(imageElement, 0, 0);
+    return this.fromCanvasRenderingContext2D<GData2d>(ctx, ctor);
+  }
+
+  static async fromImageBitmapSource<GData2d extends Data2d>(
+    source: ImageBitmapSource,
+    ctor: Data2dConstructor<GData2d>,
+    options?: ImageBitmapOptions | undefined,
+  ): Promise<GData2d> {
+    return this.fromImageBitmap<GData2d>(await createImageBitmap(source, options), ctor);
+  }
+
+  static fromImageBitmap<GData2d extends Data2d>(
+    imageBitmap: ImageBitmap,
+    ctor: Data2dConstructor<GData2d>,
+  ): GData2d {
+    const ctx: OffscreenCanvasRenderingContext2D = new OffscreenCanvas(
+      imageBitmap.width,
+      imageBitmap.height,
+    ).getContext('2d')!;
+    ctx.drawImage(imageBitmap, 0, 0);
+    return this.fromCanvasRenderingContext2D<GData2d>(ctx, ctor);
+  }
+
+  /**
+   * @deprecated
+   *
+   * const font: Data2dFromTextOptions = {
+   *     maxWidth: 256,
+   *     fontFamily: 'sans-serif',
+   *     fontSize: 16,
+   *     lineHeight: 30,
+   *     fillStyle: 'black',
+   *   };
+   *
+   *   const img = Uint8Array2d.fromText('Hello world'.repeat(5), font, Uint8Array2d);
+   */
+  static fromText<GData2d extends Data2d>(
+    text: string,
+    {
+      maxWidth,
+
+      fontFamily,
+      fontSize,
+      fontStyle = 'normal',
+      fontWeight = 'normal',
+      lineHeight,
+      // font = '16px/30px sans-serif',
+      fillStyle = 'black',
+      textAlign = 'start',
+      textBaseline = 'alphabetic',
+      direction = 'inherit',
+    }: Data2dFromTextOptions,
+    ctor: Data2dConstructor<GData2d>,
+  ): GData2d {
+    const ctx: OffscreenCanvasRenderingContext2D = new OffscreenCanvas(maxWidth, 256).getContext(
+      '2d',
+    )!;
+    const font: string = `${fontStyle} ${fontWeight} ${fontSize}px/${lineHeight}px ${fontFamily}`;
+    ctx.font = font;
+    ctx.fillStyle = fillStyle;
+    ctx.textAlign = textAlign;
+    ctx.textBaseline = textBaseline;
+    ctx.direction = direction;
+    const textMetrics: TextMetrics = ctx.measureText(text);
+    // console.log(ctx.measureText(text));
+    ctx.canvas.width = Math.ceil(textMetrics.width);
+    ctx.canvas.height = Math.ceil(lineHeight);
+
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Segmenter
+    ctx.font = font;
+    ctx.fillStyle = fillStyle;
+    ctx.textAlign = textAlign;
+    ctx.textBaseline = textBaseline;
+    ctx.direction = direction;
+
+    console.log(ctx.font);
+    ctx.fillText(text, textMetrics.actualBoundingBoxLeft, textMetrics.actualBoundingBoxAscent);
+    console.log(textMetrics);
+    console.log(textMetrics.emHeightAscent + textMetrics.emHeightDescent);
+    return this.fromCanvasRenderingContext2D<GData2d>(ctx, ctor);
+  }
+
+  static fromCanvasRenderingContext2D<GData2d extends Data2d>(
+    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    ctor: Data2dConstructor<GData2d>,
+  ): GData2d {
     return this.fromImageData<GData2d>(
       ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height),
       ctor,
@@ -128,6 +210,16 @@ export abstract class Data2d {
   abstract set(x: number, y: number, data: Data2dSetData): void;
 
   /* OPERATIONS */
+
+  clear(): this {
+    const clearBuffer = new Uint8Array(this.#bytesPerBlock);
+    for (let y: number = 0; y < this.#height; y++) {
+      for (let x: number = 0; x < this.#width; x++) {
+        this.set(x, y, clearBuffer);
+      }
+    }
+    return this;
+  }
 
   fill(data: Data2dSetData): this {
     for (let y: number = 0; y < this.#height; y++) {
@@ -279,21 +371,30 @@ export abstract class Data2d {
   }
 
   toCanvas(): HTMLCanvasElement {
-    const canvas: HTMLCanvasElement = document.createElement('canvas');
-    canvas.width = this.#width;
-    canvas.height = this.#height;
-    const ctx: CanvasRenderingContext2D = canvas.getContext('2d')!;
+    const ctx: CanvasRenderingContext2D = document.createElement('canvas').getContext('2d')!;
+    ctx.canvas.width = this.#width;
+    ctx.canvas.height = this.#height;
     ctx.putImageData(this.toImageData(), 0, 0);
-    return canvas;
+    return ctx.canvas;
   }
 
-  display(scale: number = 1): this {
+  toOffscreenCanvas(): OffscreenCanvas {
+    const ctx: OffscreenCanvasRenderingContext2D = new OffscreenCanvas(
+      this.#width,
+      this.#height,
+    ).getContext('2d')!;
+    ctx.putImageData(this.toImageData(), 0, 0);
+    return ctx.canvas;
+  }
+
+  display({ scale = 1 }: Data2dDisplayOptions = {}): this {
     const canvas: HTMLCanvasElement = this.toCanvas();
+    canvas.style.width = `${canvas.width * scale}px`;
+    canvas.style.height = `${canvas.height * scale}px`;
     canvas.style.border = `2px solid black`;
     canvas.style.margin = `32px`;
     canvas.style.imageRendering = 'pixelated';
-    canvas.style.width = `${canvas.width * scale}px`;
-    canvas.style.height = `${canvas.height * scale}px`;
+    canvas.style.backgroundImage = `url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAABlBMVEX////MzMw46qqDAAAAEElEQVQImWNg+M+AFeEQBgB+vw/xfUUZkgAAAABJRU5ErkJggg==')`;
     document.body.appendChild(canvas);
     return this;
   }
@@ -305,4 +406,33 @@ export abstract class Data2d {
     a.click();
     return this;
   }
+}
+
+/* TYPES */
+
+export interface Data2dFromTextOptions {
+  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/font) */
+  // readonly font?: string;
+
+  readonly maxWidth: number;
+
+  // /** [MDN Reference](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/font) */
+  readonly fontFamily: string;
+  readonly fontSize: number; // in px
+  readonly fontStyle?: 'normal' | 'italic' | 'oblique';
+  readonly fontWeight?: 'normal' | 'bold' | 'bolder' | 'lighter' | number;
+  readonly lineHeight: number;
+
+  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/fillStyle) */
+  readonly fillStyle?: string;
+  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/textAlign) */
+  readonly textAlign?: 'left' | 'right' | 'center' | 'start' | 'end';
+  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/textBaseline) */
+  readonly textBaseline?: 'top' | 'hanging' | 'middle' | 'alphabetic' | 'ideographic' | 'bottom';
+  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/direction) */
+  readonly direction?: 'ltr' | 'rtl' | 'inherit';
+}
+
+export interface Data2dDisplayOptions {
+  readonly scale?: number;
 }

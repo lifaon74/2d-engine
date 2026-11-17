@@ -1,25 +1,30 @@
+import { Uint8Array2d } from './images/built-in/uint8-array-2d';
 import { Data2d } from './images/data-2d';
 
 /*--------*/
 
-export class QxTile {
-  readonly #image: Data2d;
+export class QxBox {
+  readonly #width: number;
+  readonly #height: number;
+
   readonly #x: number;
   readonly #y: number;
   readonly #z: number;
 
-  constructor(image: Data2d, x: number, y: number, z: number) {
-    if (image.bytesPerBlock !== 6) {
-      throw new Error(`"image.bytesPerBlock" should be 6`);
-    }
-    this.#image = image;
+  constructor(width: number, height: number, x: number, y: number, z: number) {
+    this.#width = width;
+    this.#height = height;
     this.#x = x;
     this.#y = y;
     this.#z = z;
   }
 
-  get image(): Data2d {
-    return this.#image;
+  get width(): number {
+    return this.#width;
+  }
+
+  get height(): number {
+    return this.#height;
   }
 
   get x(): number {
@@ -35,15 +40,43 @@ export class QxTile {
   }
 }
 
-export class QxTilePancake {
-  // static fromTiles(): QxTilePancake {}
+export class QxTile extends QxBox {
+  static readonly bytesPerBlock: number = 6;
 
+  readonly #image: Data2d;
+  readonly #layer: number;
+
+  constructor(image: Data2d, x: number, y: number, z: number, layer: number = 0) {
+    if (image.bytesPerBlock !== QxTile.bytesPerBlock) {
+      throw new Error(`"image.bytesPerBlock" should be ${QxTile.bytesPerBlock}`);
+    }
+    super(image.width, image.height, x, y, z);
+    this.#image = image;
+    this.#layer = layer;
+  }
+
+  get image(): Data2d {
+    return this.#image;
+  }
+
+  get layer(): number {
+    return this.#layer;
+  }
+}
+
+export class QxTilePancake {
   readonly #opaqueLayer: Data2d;
   readonly #transparentLayers: readonly Data2d[];
+  readonly #transparentLayersStartIndexes: Uint8Array;
+  readonly #transparentLayersEndIndexes: Uint8Array;
 
-  constructor(opaqueLayer: Data2d, transparentLayers: readonly Data2d[]) {
-    this.#opaqueLayer = opaqueLayer;
-    this.#transparentLayers = transparentLayers;
+  constructor(width: number, height: number, layers: number = 8) {
+    this.#opaqueLayer = new Uint8Array2d(width, height, QxTile.bytesPerBlock);
+    this.#transparentLayers = Array.from({ length: layers }, (): Uint8Array2d => {
+      return new Uint8Array2d(width, height, QxTile.bytesPerBlock);
+    });
+    this.#transparentLayersStartIndexes = new Uint8Array(width * height);
+    this.#transparentLayersEndIndexes = new Uint8Array(width * height);
   }
 
   get opaqueLayer(): Data2d {
@@ -54,8 +87,62 @@ export class QxTilePancake {
     return this.#transparentLayers;
   }
 
+  #clearLayers(): void {
+    this.#opaqueLayer.clear();
+    const mid: number = Math.floor(this.#transparentLayers.length / 2);
+    this.#transparentLayersStartIndexes.fill(mid);
+    this.#transparentLayersEndIndexes.fill(mid);
+  }
+
   generatePancake(tiles: readonly QxTile[]): void {}
 }
+
+// export class QxTilePancake {
+//   static create(width: number, height: number, layers: number = 8): QxTilePancake {
+//     return new QxTilePancake(
+//       new Uint8Array2d(width, height, QxTile.bytesPerBlock),
+//       Array.from({ length: layers }, (): Uint8Array2d => {
+//         return new Uint8Array2d(width, height, QxTile.bytesPerBlock);
+//       }),
+//       new Uint8Array(width * height),
+//       new Uint8Array(width * height),
+//     );
+//   }
+//
+//   readonly #opaqueLayer: Data2d;
+//   readonly #transparentLayers: readonly Data2d[];
+//   readonly #transparentLayersStartIndexes: Uint8Array;
+//   readonly #transparentLayersEndIndexes: Uint8Array;
+//
+//   protected constructor(
+//     opaqueLayer: Data2d,
+//     transparentLayers: readonly Data2d[],
+//     transparentLayersStartIndexes: Uint8Array,
+//     transparentLayersEndIndexes: Uint8Array,
+//   ) {
+//     this.#opaqueLayer = opaqueLayer;
+//     this.#transparentLayers = transparentLayers;
+//     this.#transparentLayersStartIndexes = transparentLayersStartIndexes;
+//     this.#transparentLayersEndIndexes = transparentLayersEndIndexes;
+//   }
+//
+//   get opaqueLayer(): Data2d {
+//     return this.#opaqueLayer;
+//   }
+//
+//   get transparentLayers(): readonly Data2d[] {
+//     return this.#transparentLayers;
+//   }
+//
+//   #clearLayers(): void {
+//     this.#opaqueLayer.clear();
+//     const mid: number = Math.floor(this.#transparentLayers.length / 2);
+//     this.#transparentLayersStartIndexes.fill(mid);
+//     this.#transparentLayersEndIndexes.fill(mid);
+//   }
+//
+//   generatePancake(tiles: readonly QxTile[]): void {}
+// }
 
 // export class QuadTreeItem {
 //   readonly #x: number;
@@ -94,12 +181,32 @@ export class QxTilePancake {
 //   constructor() {}
 // }
 
-export class QxCpuRenderer2d {
-  // readonly #quadTree:
-  readonly #tiles: readonly QxTile[];
+// export class QxTileQuadTree {
+//   readonly children: [
+//     QxTileQuadTree | undefined,
+//     QxTileQuadTree | undefined,
+//     QxTileQuadTree | undefined,
+//     QxTileQuadTree | undefined,
+//   ] = new Array<QxTileQuadTree | undefined>(4);
+//
+//   add(tile: QxTile): void {
+//
+//   }
+// }
 
-  constructor() {
-    this.#tiles = [];
+export class QxTileRenderer {
+  static readonly quadTreeDepth: number = 32;
+
+  readonly #quadTrees: readonly QxTileQuadTree[];
+
+  // readonly #quadTree:
+  // readonly #tiles: readonly QxTile[];
+
+  constructor(layers: number = 8) {
+    this.#quadTrees = Array.from({ length: layers }, (): QxTileQuadTree => {
+      return new QxTileQuadTree();
+    });
+    // this.#tiles = [];
   }
 
   add(tile: QxTile): void {}
@@ -111,33 +218,27 @@ export class QxCpuRenderer2d {
 
 /*--------*/
 
-export function debugV3() {
-  const viewport = new QxViewport();
-  // viewport.width = 256;
-  // viewport.height = 256;
-  viewport.width = 1024;
-  viewport.height = 1024;
-  viewport.scale = 1;
-  document.body.appendChild(viewport);
+async function debugV3_00() {
+  const img = await Uint8Array2d.fromUrl(
+    'assets/floors/floor--grass-01.png',
+    // new URL('assets/floors/floor--grass-01.png', import.meta.url),
+  );
+  // const img = new Uint8Array2d(256, 256);
 
-  const tileWith: number = 16;
-  const tileHeight: number = 16;
+  img.display();
+}
 
-  for (let x: number = 0; x < viewport.width / tileWith; x++) {
-    for (let y: number = 0; y < viewport.height / tileHeight; y++) {
-      const tile = new QxTile();
-      tile.width = tileWith;
-      tile.height = tileHeight;
-      tile.x = x * tileWith;
-      tile.y = y * tileHeight;
-      tile.src = 'assets/floors/floor--grass-01.png';
-      viewport.appendChild(tile);
-    }
-  }
+async function debugV3_01() {
+  const img = await Uint8Array2d.fromUrl('assets/trees/tree-00.png');
 
-  const animate = (): void => {
-    // viewport.x = (viewport.x + 1) % viewport.width;
-    requestAnimationFrame(animate);
-  };
-  animate();
+  const tile = new QxTile(img, 0, 0, 0);
+
+  img.display();
+}
+
+/*--------*/
+
+export async function debugV3() {
+  // await debugV3_00();
+  await debugV3_01();
 }

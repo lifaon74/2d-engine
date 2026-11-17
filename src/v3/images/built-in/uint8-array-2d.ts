@@ -103,6 +103,11 @@ export class Uint8Array2d extends Data2d {
 
   /* OPERATIONS */
 
+  override clear(): this {
+    this.#data.fill(0);
+    return this;
+  }
+
   override cut(x: number, y: number, width: number, height: number): Uint8Array2d;
   override cut<GData2d extends Data2d>(
     x: number,
@@ -129,11 +134,7 @@ export class Uint8Array2d extends Data2d {
     }
 
     return new ImageData(
-      new Uint8ClampedArray(
-        this.#data.buffer,
-        this.#data.byteOffset,
-        this.#data.byteLength,
-      ) as ImageDataArray,
+      new Uint8ClampedArray(this.#data.buffer, this.#data.byteOffset, this.#data.byteLength),
       this.width,
       this.height,
     );
